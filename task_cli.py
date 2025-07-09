@@ -1,36 +1,47 @@
 import cmd
 from datetime import date
 from tabulate import tabulate
+import json
+import os
 
 class TaskTracker(cmd.Cmd):
     intro = 'Welcome to the Task Tracker!\n'
     prompt = 'task-cli> '
     
-    tasks = [{
-        "id" : 1,
-        "description" : "",
-        "status" : "to-do",
-        "createdAt" : "1/1/2001",
-        "updatedAt" : "2/2/2002"
-    }]
-    task_count = 2
+    if not os.path.exists("tasks.json") :
+        with open("tasks.json", "w") as tasks:
+            json.dump([],tasks)
     
     def do_add(self, arg):
         """ Add a task: add <new_description>"""
         if not arg:
             print("Usage: add <task_description>")
         else:
+            arg = arg.strip('"')
             today = date.today().strftime("%d/%m/%Y")
+            with open("tasks.json", "r") as file:
+                data = json.load(file)
+                if data :
+                    for task in data:
+                        task_id = max(task["id"])
+                    task_id += 1
+                else :
+                    task_id = 1
+        
             new_task = {
-                "id" : self.task_count,
+                "id" : task_id,
                 "description" : arg,
                 "status" : "to-do",
                 "createdAt" : today,
                 "updatedAt" : today
             }
-            self.tasks.append(new_task)
-            print(f"Task {arg} added.")
-            self.task_count += 1
+            
+            data.append(new_task)
+            
+            with open("tasks.json", "w") as file :
+                json.dump(data, file, indent=6)
+            
+            print(f"✅ Task {arg} added.")
         
     
     
@@ -44,38 +55,56 @@ class TaskTracker(cmd.Cmd):
         
         try:
             task_id = int(parts[0])
-            new_task_description = parts[1]
+            new_task_description = parts[1].strip('"')
+            found = False
             
-            for task in self.tasks:
-                if task["id"] == task_id:
-                    task["description"] = new_task_description
-                    task["updatedAt"] = date.today().strftime("%d/%m/%Y")
-                    print(f"task {task_id} updated successfully.")
-                    return
+            with open("tasks.json", "r") as file:
+                data = json.load(file)
+                
+            if data:
+                for task in data:
+                    if task["id"] == task_id:
+                        found = not found
+                        task["description"] = new_task_description
+                        task["updatedAt"] = date.today().strftime("%d/%m/%Y")
+                        with open("tasks.json", "w") as f:
+                            json.dump(data, f, indent=6)
+                        print(f"task {task_id} updated successfully.")
+                        return
+                        
+            else:
+                print("No tasks available")
+                
             print(f"❌ Task with id {task_id} not found.")
             
         except ValueError:
             print("Invalid ID.")
         
             
-    def do_list(self, arg):
-        if not self.tasks:
+    def do_list(self):
+        with open("tasks.json", "r") as f:
+            data = json.load(f)
+            
+        if not data:
             print("No tasks found.")
         else:
-            print(tabulate(self.tasks, headers="keys", tablefmt="grid", ))
+            print(tabulate(data, headers="keys", tablefmt="grid", ))
         
             
     def do_delete(self, arg):
         """ Delete a task: delete <id> """
         try:
             task_id = int(arg)
-            print(type(task_id))
-            for task in self.tasks:
-                if task["id"] == task_id:
-                    self.tasks.remove(task)
-                    print(f"task {task_id} removed successfully.")
-                    return
-            print(f"❌ Task with id {task_id} not found.")
+            with open("tasks.json", "r") as file:
+                data = json.load(file)
+            
+            if data:
+                new_data = [task for task in data if task["id"] != task_id]
+                
+            with open("tasks.json", "w") as f:
+                json.dump(new_data, f, indent=6)
+
+            print(f"❌ Task with id {task_id} not found.") if data == new_data else print(f"✅ Task with id {task_id} was removed.") 
             
         except ValueError:
             print("Invalid ID.")
